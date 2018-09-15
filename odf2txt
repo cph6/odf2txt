@@ -742,14 +742,32 @@ class styled_content_parser(simple_content_parser):
     self.text = ''
 
 #------------------------------------------------------------------------------
-def print_raw(archive, filename):
-  data = archive.read(filename)
-  print data
-
-#------------------------------------------------------------------------------
-def parse_xml(archive, filename, parser):
-  data = archive.read(filename)
+def parse_xml(data, parser):
   xml.sax.parseString(data, parser)
+
+class OdtFile(object):
+  def __init__(self, filename):
+    if filename.endswith(".odt"):
+      self._archive = zipfile.ZipFile(args.document)
+      self._doc = None
+    elif filename.endswith(".fodt"):
+      self._doc = filename
+      self._archive = None
+    else:
+      raise RuntimeException('unrecognised file extension for %s' % filename)
+
+  def read_styles(self):
+    if self._archive:
+      return self._archive.read("styles.xml")
+    else:
+      return ''
+
+  def read_content(self):
+    if self._archive:
+      return self._archive.read("content.xml")
+    elif self._doc:
+      with open(self._doc) as fh:
+        return fh.read()
 
 #------------------------------------------------------------------------------
 def main():
@@ -768,20 +786,19 @@ def main():
 
   global args
   args = parser.parse_args()
-  archive = zipfile.ZipFile(args.document)
+  doc = OdtFile(args.document)
 
   # Are we reading the raw XML?
   if args.raw:
     # Print style (if requested) and content, then exit
-    args.style and print_raw(archive, 'styles.xml')
-    print_raw(archive, 'content.xml')
-    return
-
-  if args.style:
-    parse_xml(archive, 'styles.xml', style_parser())
-    parse_xml(archive, 'content.xml', styled_content_parser())
+    if args.style:
+      print doc.read_styles()
+    print doc.read_content()
+  elif args.style:
+    parse_xml(doc.read_styles(), style_parser())
+    parse_xml(doc.read_content(), styled_content_parser())
   else:
-    parse_xml(archive, 'content.xml', simple_content_parser())
+    parse_xml(doc.read_content(), simple_content_parser())
 
 #------------------------------------------------------------------------------
 if __name__ == '__main__':
